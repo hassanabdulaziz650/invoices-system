@@ -1,7 +1,6 @@
 const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const cors = require('cors');
-const path = require('path');
 const fs = require('fs');
 
 const app = express();
@@ -9,9 +8,6 @@ const PORT = process.env.PORT || 3000;
 
 app.use(cors());
 app.use(express.json());
-
-if (!fs.existsSync('public')) fs.mkdirSync('public');
-app.use(express.static('public'));
 
 if (!fs.existsSync('data')) fs.mkdirSync('data');
 
@@ -33,106 +29,87 @@ db.serialize(() => {
     )`);
 });
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, 'public', 'index.html'));
-});
+// ═══════════════════ HTML PAGE ═══════════════════
 
-app.get('/api/invoices', (req, res) => {
-    const { status, search } = req.query;
-    let sql = 'SELECT * FROM invoices WHERE 1=1';
-    let params = [];
-
-    if (status) {
-        sql += ' AND delivery_status = ?';
-        params.push(status);
-    }
-    if (search) {
-        sql += ' AND (invoice_number LIKE ? OR customer_name LIKE ? OR sales_rep LIKE ?)';
-        params.push(`%${search}%`, `%${search}%`, `%${search}%`);
-    }
-    sql += ' ORDER BY created_at DESC';
-
-    db.all(sql, params, (err, rows) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, data: rows });
-    });
-});
-
-app.get('/api/stats', (req, res) => {
-    db.get(`SELECT 
-        COUNT(*) as total,
-        SUM(CASE WHEN delivery_status = 'تم التوصيل' THEN 1 ELSE 0 END) as delivered,
-        SUM(CASE WHEN delivery_status = 'معلقة' THEN 1 ELSE 0 END) as pending,
-        SUM(CASE WHEN delivery_status = 'ملغية' THEN 1 ELSE 0 END) as cancelled,
-        SUM(CASE WHEN delivery_status = 'مرتجع' THEN 1 ELSE 0 END) as returned
-    FROM invoices`, [], (err, row) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, data: row });
-    });
-});
-
-app.get('/api/invoices/:id', (req, res) => {
-    db.get('SELECT * FROM invoices WHERE id = ?', [req.params.id], (err, row) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, data: row });
-    });
-});
-
-app.post('/api/invoices', (req, res) => {
-    const { invoice_number, invoice_date, customer_name, sales_rep, 
-            delivery_status, driver_name, branch, notes, items } = req.body;
-
-    const sql = `INSERT INTO invoices 
-        (invoice_number, invoice_date, customer_name, sales_rep, 
-         delivery_status, driver_name, branch, notes, items) 
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`;
-
-    db.run(sql, [invoice_number, invoice_date, customer_name, sales_rep,
-                 delivery_status || 'معلقة', driver_name, branch, notes, 
-                 JSON.stringify(items || [])], function(err) {
-        if (err) {
-            if (err.message.includes('UNIQUE')) {
-                return res.status(400).json({ error: 'رقم الفاتورة موجود مسبقاً' });
-            }
-            return res.status(500).json({ error: err.message });
-        }
-        res.json({ success: true, id: this.lastID, message: 'تم الإضافة بنجاح' });
-    });
-});
-
-app.put('/api/invoices/:id', (req, res) => {
-    const { invoice_number, invoice_date, customer_name, sales_rep, 
-            delivery_status, driver_name, branch, notes } = req.body;
-
-    db.run(`UPDATE invoices SET 
-        invoice_number = ?, invoice_date = ?, customer_name = ?,
-        sales_rep = ?, delivery_status = ?, driver_name = ?,
-        branch = ?, notes = ?
-        WHERE id = ?`,
-        [invoice_number, invoice_date, customer_name, sales_rep,
-         delivery_status, driver_name, branch, notes, req.params.id],
-        function(err) {
-            if (err) return res.status(500).json({ error: err.message });
-            res.json({ success: true, message: 'تم التحديث بنجاح' });
-        });
-});
-
-app.patch('/api/invoices/:id/status', (req, res) => {
-    const { delivery_status } = req.body;
-    db.run('UPDATE invoices SET delivery_status = ? WHERE id = ?', 
-        [delivery_status, req.params.id], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, message: 'تم تغيير الحالة' });
-    });
-});
-
-app.delete('/api/invoices/:id', (req, res) => {
-    db.run('DELETE FROM invoices WHERE id = ?', [req.params.id], function(err) {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true, message: 'تم الحذف بنجاح' });
-    });
-});
-
-app.listen(PORT, () => {
-    console.log(`Server running on port ${PORT}`);
-});
+const HTML_PAGE = `<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة الفواتير</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; padding: 20px; }
+        .container { max-width: 1200px; margin: 0 auto; }
+        .header { text-align: center; color: white; margin-bottom: 30px; padding: 20px; }
+        .header h1 { font-size: 2.5rem; margin-bottom: 10px; }
+        .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 20px; margin-bottom: 30px; }
+        .stat-card { background: white; border-radius: 15px; padding: 25px; text-align: center; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        .stat-card .icon { font-size: 2.5rem; margin-bottom: 10px; }
+        .stat-card .number { font-size: 2rem; font-weight: bold; color: #333; }
+        .stat-card .label { color: #666; font-size: 0.9rem; }
+        .main-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 20px; }
+        .form-section, .table-section { background: white; border-radius: 15px; padding: 25px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+        h2 { color: #667eea; margin-bottom: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #555; font-weight: bold; }
+        input, select { width: 100%; padding: 12px; border: 2px solid #e0e0e0; border-radius: 8px; font-family: Arial; }
+        .btn { width: 100%; padding: 12px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-bottom: 10px; font-size: 1rem; }
+        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; }
+        .btn-success { background: linear-gradient(135deg, #4CAF50 0%, #45a049 100%); color: white; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 12px; text-align: right; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; color: #667eea; font-weight: bold; }
+        .status-badge { padding: 5px 12px; border-radius: 20px; font-size: 0.85rem; font-weight: bold; }
+        .status-delivered { background: #e8f5e9; color: #2e7d32; }
+        .status-pending { background: #fff3e0; color: #ef6c00; }
+        .status-cancelled { background: #ffebee; color: #c62828; }
+        .status-returned { background: #f3e5f5; color: #6a1b9a; }
+        .actions { display: flex; gap: 5px; }
+        .btn-small { padding: 5px 10px; border: none; border-radius: 5px; cursor: pointer; font-size: 0.8rem; }
+        .btn-delete { background: #f44336; color: white; }
+        .btn-status { background: #FF9800; color: white; }
+        .toast { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: #333; color: white; padding: 15px 25px; border-radius: 10px; display: none; z-index: 2000; font-weight: bold; }
+        .toast.show { display: block; }
+        .toast.success { background: #4CAF50; }
+        .toast.error { background: #f44336; }
+        .empty-state { text-align: center; padding: 40px; color: #999; }
+        @media (max-width: 768px) { .main-grid { grid-template-columns: 1fr; } .stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📊 نظام إدارة الفواتير</h1>
+            <p>تتبع وإدارة فواتير التوصيل بكل سهولة</p>
+        </div>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="icon">📋</div>
+                <div class="number" id="stat-total">0</div>
+                <div class="label">إجمالي الفواتير</div>
+            </div>
+            <div class="stat-card">
+                <div class="icon">✅</div>
+                <div class="number" id="stat-delivered">0</div>
+                <div class="label">تم التوصيل</div>
+            </div>
+            <div class="stat-card">
+                <div class="icon">⏳</div>
+                <div class="number" id="stat-pending">0</div>
+                <div class="label">معلقة</div>
+            </div>
+            <div class="stat-card">
+                <div class="icon">❌</div>
+                <div class="number" id="stat-cancelled">0</div>
+                <div class="label">ملغية</div>
+            </div>
+            <div class="stat-card">
+                <div class="icon">🔄</div>
+                <div class="number" id="stat-returned">0</div>
+                <div class="label">مرتجع</div>
+            </div>
+        </div>
+        <div class="main-grid">
+            <div class="form-section">
+                <h2>📝 إضافة فاتورة جديد
