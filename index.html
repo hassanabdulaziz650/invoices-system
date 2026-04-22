@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة الفواتير والأرشفة</title>
+    <link rel="stylesheet" href="https://cloudflare.com">
+    <script src="https://cloudflare.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        :root { --primary: #2c3e50; --secondary: #3498db; --success: #27ae60; --warning: #f39c12; --danger: #e74c3c; --light: #ecf0f1; --dark: #2c3e50; }
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; }
+
+        /* Sidebar - التصميم الأول */
+        .sidebar { width: 280px; background: var(--primary); color: white; position: fixed; height: 100vh; z-index: 1000; box-shadow: 4px 0 15px rgba(0,0,0,0.1); }
+        .logo { padding: 20px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .logo i { font-size: 2.5rem; color: var(--secondary); margin-bottom: 10px; }
+        .logo-text { font-size: 1.3rem; font-weight: bold; }
+        .nav-menu { padding: 20px 0; }
+        .nav-item { padding: 15px 25px; cursor: pointer; transition: all 0.3s ease; display: flex; align-items: center; gap: 15px; border-right: 4px solid transparent; }
+        .nav-item:hover, .nav-item.active { background: rgba(255,255,255,0.1); border-right-color: var(--secondary); }
+
+        /* Main Content */
+        .main-content { flex: 1; margin-right: 280px; padding: 20px; width: calc(100% - 280px); }
+        .header { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); margin-bottom: 30px; display: flex; justify-content: space-between; align-items: center; }
+        
+        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); margin-bottom: 25px; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 8px; transition: 0.3s; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-primary { background: var(--secondary); color: white; }
+        .btn-excel { background: #1D6F42; color: white; }
+
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; }
+        th, td { padding: 15px; text-align: right; border-bottom: 1px solid #eee; }
+        th { background: #f8f9fa; }
+
+        .content-section { display: none; animation: fadeIn 0.4s ease; }
+        .content-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+    </style>
+</head>
+<body>
+
+    <aside class="sidebar">
+        <div class="logo">
+            <i class="fas fa-file-invoice-dollar"></i>
+            <div class="logo-text">نظام أبعاد</div>
+        </div>
+        <nav class="nav-menu">
+            <div class="nav-item active" onclick="showSection('dashboard', this)"><i class="fas fa-home"></i> الرئيسية</div>
+            <div class="nav-item" onclick="showSection('add-invoice', this)"><i class="fas fa-plus-circle"></i> إضافة فاتورة</div>
+            <div class="nav-item" onclick="showSection('archive', this)"><i class="fas fa-archive"></i> الأرشيف</div>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <header class="header">
+            <h2 id="page-title">لوحة التحكم</h2>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-excel" onclick="exportToExcel()"><i class="fas fa-file-export"></i> تصدير</button>
+                <label class="btn btn-primary" style="margin-bottom:0">
+                    <i class="fas fa-file-import"></i> استيراد
+                    <input type="file" id="importFile" hidden onchange="importFromExcel(event)">
+                </label>
+            </div>
+        </header>
+
+        <!-- الأقسام -->
+        <section id="dashboard" class="content-section active">
+            <div class="card"><h3>مرحباً بك</h3><p>استخدم القائمة الجانبية لإدارة النظام.</p></div>
+        </section>
+
+        <section id="add-invoice" class="content-section">
+            <div class="card">
+                <h3>فاتورة جديدة</h3>
+                <input type="text" id="custName" placeholder="اسم العميل">
+                <input type="date" id="invDate">
+                <input type="number" id="invAmount" placeholder="المبلغ">
+                <button class="btn btn-success" style="width:100%; margin-top:10px;" onclick="saveInvoice()">حفظ</button>
+            </div>
+        </section>
+
+        <section id="archive" class="content-section">
+            <div class="card">
+                <h3>الأرشيف</h3>
+                <table id="invoiceTable">
+                    <thead><tr><th>العميل</th><th>التاريخ</th><th>المبلغ</th></tr></thead>
+                    <tbody id="invoiceBody"></tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <script>
+        // تنقل بين الأقسام
+        function showSection(id, el) {
+            document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            el.classList.add('active');
+            document.getElementById('page-title').innerText = el.innerText;
+            if(id === 'archive') renderTable();
+        }
+
+        // حفظ للفاعدة
+        async function saveInvoice() {
+            const name = document.getElementById('custName').value;
+            const date = document.getElementById('invDate').value;
+            const amount = document.getElementById('invAmount').value;
+            if(!name || !amount) return alert("املأ البيانات");
+
+            await fetch('/api/invoices', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({name, date, amount})
+            });
+            alert("تم الحفظ");
+            document.getElementById('custName').value = '';
+        }
+
+        // جلب البيانات للجدول
+        async function renderTable() {
+            const res = await fetch('/api/invoices');
+            const data = await res.json();
+            document.getElementById('invoiceBody').innerHTML = data.map(i => `
+                <tr><td>${i.customer_name}</td><td>${new Date(i.invoice_date).toLocaleDateString('ar-EG')}</td><td>${i.amount} ر.س</td></tr>
+            `).join('');
+        }
+
+        // تصدير إكسل
+        function exportToExcel() {
+            const table = document.getElementById("invoiceTable");
+            const wb = XLSX.utils.table_to_book(table);
+            XLSX.writeFile(wb, "الفواتير.xlsx");
+        }
+
+        // استيراد إكسل
+        function importFromExcel(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = async function(event) {
+                const data = new Uint8Array(event.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(sheet);
+                
+                for(let row of jsonData) {
+                    await fetch('/api/invoices', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            name: row.العميل || row.name,
+                            date: row.التاريخ || row.date,
+                            amount: row.المبلغ || row.amount
+                        })
+                    });
+                }
+                alert("تم الاستيراد بنجاح");
+                renderTable();
+            };
+            reader.readAsArrayBuffer(file);
+        }
+    </script>
+</body>
+</html>
