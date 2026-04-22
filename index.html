@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة الفواتير والأرشفة</title>
+    <link rel="stylesheet" href="https://cloudflare.com">
+    <script src="https://cloudflare.com"></script>
+    <script src="https://cloudflare.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        :root { --primary: #2c3e50; --secondary: #3498db; --success: #27ae60; --light: #ecf0f1; }
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; color: #333; }
+        .container { display: flex; min-height: 100vh; }
+        .sidebar { width: 280px; background: var(--primary); color: white; position: fixed; height: 100vh; }
+        .main-content { flex: 1; margin-right: 280px; padding: 20px; }
+        .header { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); margin-bottom: 30px; }
+        .card { background: white; padding: 25px; border-radius: 15px; box-shadow: 0 5px 20px rgba(0,0,0,0.1); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="sidebar">
+            <div class="logo">
+                <i class="fas fa-file-invoice-dollar"></i>
+                <div class="logo-text">نظام الفواتير</div>
+            </div>
+            <div class="nav-menu">
+                <div class="nav-item active"><i class="fas fa-home"></i> الرئيسية</div>
+                <div class="nav-item"><i class="fas fa-plus"></i> فاتورة جديدة</div>
+                <div class="nav-item"><i class="fas fa-archive"></i> الأرشيف</div>
+            </div>
+        </div>
+        <div class="main-content">
+            <div class="header">
+                <h2>لوحة التحكم</h2>
+                <div class="user-info">مرحباً بك يا بطل</div>
+            </div>
+            <div class="card">
+                <h3>محتوى التطبيق</h3>
+                <p>تطبيقك الآن جاهز للعمل على Render!</p>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
