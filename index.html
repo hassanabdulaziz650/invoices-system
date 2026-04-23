@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة الفواتير</title>
+    <link rel="stylesheet" href="https://cloudflare.com">
+    <script src="https://cloudflare.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; }
+        .sidebar { width: 280px; background: #2c3e50; color: white; position: fixed; height: 100vh; }
+        .nav-item { padding: 15px 25px; cursor: pointer; display: flex; align-items: center; gap: 15px; }
+        .nav-item.active { background: rgba(255,255,255,0.1); border-right: 4px solid #3498db; }
+        .main-content { flex: 1; margin-right: 280px; padding: 20px; width: calc(100% - 280px); }
+        .dashboard-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .card { background: white; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .card-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; }
+        .val { font-size: 1.8rem; font-weight: bold; }
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; color: white; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 15px; overflow: hidden; }
+        th, td { padding: 15px; text-align: right; border-bottom: 1px solid #eee; }
+        .content-section { display: none; }
+        .content-section.active { display: block; }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div style="padding:25px; text-align:center; border-bottom:1px solid #444;">نظام أبعاد</div>
+        <div class="nav-item active" onclick="showSection('dashboard', this)"><i class="fas fa-home"></i> الرئيسية</div>
+        <div class="nav-item" onclick="showSection('add', this)"><i class="fas fa-plus"></i> إضافة</div>
+        <div class="nav-item" onclick="showSection('archive', this)"><i class="fas fa-archive"></i> الأرشيف</div>
+    </aside>
+
+    <main class="main-content">
+        <div class="dashboard-cards" id="dashboard">
+            <div class="card"><div class="card-icon" style="background:#fee; color:#e74c3c"><i class="fas fa-times"></i></div><div>ملغية</div><div class="val" id="t4">0</div></div>
+            <div class="card"><div class="card-icon" style="background:#fff4e6; color:#f39c12"><i class="fas fa-clock"></i></div><div>معلقة</div><div class="val" id="t3">0</div></div>
+            <div class="card"><div class="card-icon" style="background:#efe; color:#27ae60"><i class="fas fa-check"></i></div><div>تم التوصيل</div><div class="val" id="t2">0</div></div>
+            <div class="card"><div class="card-icon" style="background:#eef; color:#3498db"><i class="fas fa-calculator"></i></div><div>إجمالي الفواتير</div><div class="val" id="t1">0</div></div>
+        </div>
+
+        <section id="add" class="content-section">
+            <div class="card">
+                <input type="text" id="n" placeholder="الاسم">
+                <input type="number" id="a" placeholder="المبلغ">
+                <button class="btn" style="background:#27ae60; width:100%" onclick="save()">حفظ</button>
+            </div>
+        </section>
+
+        <section id="archive" class="content-section active">
+            <div style="margin-bottom:15px; display:flex; gap:10px;">
+                <button class="btn" style="background:#3498db" onclick="exportToExcel()">تصدير</button>
+                <label class="btn" style="background:#27ae60; cursor:pointer;">استيراد <input type="file" hidden onchange="importFromExcel(event)"></label>
+            </div>
+            <table>
+                <thead><tr><th>العميل</th><th>التاريخ</th><th>المبلغ</th><th>الحالة</th></tr></thead>
+                <tbody id="b"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <script>
+        function showSection(id, el) {
+            document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            loadData();
+        }
+
+        async function save() {
+            const data = { name: document.getElementById('n').value, amount: document.getElementById('a').value, status: 'تم التوصيل' };
+            await fetch('/api/invoices', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+            alert("تم الحفظ"); loadData();
+        }
+
+        async function loadData() {
+            const res = await fetch('/api/invoices');
+            const data = await res.json();
+            document.getElementById('b').innerHTML = data.map(i => `<tr><td>${i.customer_name}</td><td>${new Date(i.invoice_date).toLocaleDateString()}</td><td>${i.amount}</td><td>${i.status}</td></tr>`).join('');
+            document.getElementById('t1').innerText = data.length;
+            document.getElementById('t2').innerText = data.filter(i => i.status === 'تم التوصيل').length;
+            document.getElementById('t3').innerText = data.filter(i => i.status === 'معلقة').length;
+            document.getElementById('t4').innerText = data.filter(i => i.status === 'ملغية').length;
+        }
+
+        async function importFromExcel(e) {
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+                const workbook = XLSX.read(new Uint8Array(ev.target.result), {type: 'array'});
+                const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                for(let row of jsonData) {
+                    const keys = Object.keys(row);
+                    await fetch('/api/invoices', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            name: row[keys[0]] || "بدون اسم",
+                            amount: row[keys[1]] || 0,
+                            date: row[keys[2]] || new Date(),
+                            status: "تم التوصيل"
+                        })
+                    });
+                }
+                alert("تم الاستيراد بنجاح"); loadData();
+            };
+            reader.readAsArrayBuffer(e.target.files[0]);
+        }
+        window.onload = loadData;
+    </script>
+</body>
+</html>
