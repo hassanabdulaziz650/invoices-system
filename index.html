@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>نظام إدارة الفواتير والأرشفة</title>
+    <link rel="stylesheet" href="https://cloudflare.com">
+    <script src="https://cloudflare.com"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Segoe UI', sans-serif; }
+        :root { --primary: #2c3e50; --secondary: #3498db; --success: #27ae60; --warning: #f39c12; --danger: #e74c3c; --purple: #9b59b6; }
+        body { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; display: flex; }
+        
+        .sidebar { width: 280px; background: var(--primary); color: white; position: fixed; height: 100vh; z-index: 1000; }
+        .logo { padding: 25px; text-align: center; border-bottom: 1px solid rgba(255,255,255,0.1); }
+        .nav-item { padding: 15px 25px; cursor: pointer; display: flex; align-items: center; gap: 15px; transition: 0.3s; }
+        .nav-item.active { background: rgba(255,255,255,0.1); border-right: 4px solid var(--secondary); }
+
+        .main-content { flex: 1; margin-right: 280px; padding: 20px; width: calc(100% - 280px); }
+        .header { background: white; padding: 20px; border-radius: 15px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: center; }
+
+        /* الأيقونات التي طلبتها */
+        .dashboard-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 25px; }
+        .card { background: white; padding: 20px; border-radius: 15px; text-align: center; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .card-icon { width: 50px; height: 50px; border-radius: 12px; display: flex; align-items: center; justify-content: center; margin: 0 auto 10px; font-size: 1.2rem; }
+        .val { font-size: 1.8rem; font-weight: bold; color: var(--primary); }
+        .label { color: #7f8c8d; font-size: 0.9rem; }
+
+        .btn { padding: 10px 20px; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; display: inline-flex; align-items: center; gap: 8px; }
+        .btn-success { background: var(--success); color: white; }
+        .btn-primary { background: var(--secondary); color: white; }
+        input { width: 100%; padding: 12px; margin: 10px 0; border: 1px solid #ddd; border-radius: 8px; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 15px; overflow: hidden; }
+        th, td { padding: 15px; text-align: right; border-bottom: 1px solid #eee; }
+        .content-section { display: none; }
+        .content-section.active { display: block; }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="logo"><i class="fas fa-file-invoice-dollar fa-2x"></i><br>نظام أبعاد</div>
+        <div class="nav-menu">
+            <div class="nav-item active" onclick="showSection('dashboard', this)"><i class="fas fa-home"></i> الرئيسية</div>
+            <div class="nav-item" onclick="showSection('add', this)"><i class="fas fa-plus"></i> إضافة فاتورة</div>
+            <div class="nav-item" onclick="showSection('archive', this)"><i class="fas fa-archive"></i> الأرشيف</div>
+        </div>
+    </aside>
+
+    <main class="main-content">
+        <header class="header">
+            <h2 id="title">لوحة التحكم</h2>
+            <div style="display: flex; gap: 10px;">
+                <button class="btn btn-primary" onclick="exportToExcel()"><i class="fas fa-file-export"></i> تصدير</button>
+                <label class="btn btn-success" style="margin:0; cursor:pointer;">
+                    <i class="fas fa-file-import"></i> استيراد ذكي 
+                    <input type="file" hidden onchange="importFromExcel(event)">
+                </label>
+            </div>
+        </header>
+
+        <section id="dashboard" class="content-section active">
+            <div class="dashboard-cards">
+                <div class="card"><div class="card-icon" style="background:#eef; color:var(--secondary)"><i class="fas fa-calculator"></i></div><div class="label">إجمالي الفواتير</div><div class="val" id="t1">0</div></div>
+                <div class="card"><div class="card-icon" style="background:#efe; color:var(--success)"><i class="fas fa-check"></i></div><div class="label">تم التوصيل</div><div class="val" id="t2">0</div></div>
+                <div class="card"><div class="card-icon" style="background:#fff4e6; color:var(--warning)"><i class="fas fa-clock"></i></div><div class="label">معلقة</div><div class="val" id="t3">0</div></div>
+                <div class="card"><div class="card-icon" style="background:#fee; color:var(--danger)"><i class="fas fa-times"></i></div><div class="label">ملغية</div><div class="val" id="t4">0</div></div>
+                <div class="card"><div class="card-icon" style="background:#f5eef8; color:var(--purple)"><i class="fas fa-undo"></i></div><div class="label">مرتجع</div><div class="val" id="t5">0</div></div>
+            </div>
+        </section>
+
+        <section id="add" class="content-section">
+            <div class="card">
+                <h3>إضافة فاتورة</h3>
+                <input type="text" id="n" placeholder="اسم العميل">
+                <input type="date" id="d">
+                <input type="number" id="a" placeholder="المبلغ">
+                <select id="s" style="width:100%; padding:12px; margin:10px 0; border-radius:8px; border:1px solid #ddd;">
+                    <option value="تم التوصيل">تم التوصيل</option>
+                    <option value="معلقة">معلقة</option>
+                    <option value="ملغية">ملغية</option>
+                    <option value="مرتجع">مرتجع</option>
+                </select>
+                <button class="btn btn-success" style="width:100%" onclick="save()">حفظ في القاعدة</button>
+            </div>
+        </section>
+
+        <section id="archive" class="content-section">
+            <table>
+                <thead><tr><th>العميل</th><th>التاريخ</th><th>المبلغ</th><th>الحالة</th></tr></thead>
+                <tbody id="b"></tbody>
+            </table>
+        </section>
+    </main>
+
+    <script>
+        function showSection(id, el) {
+            document.querySelectorAll('.content-section').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+            if(el) el.classList.add('active');
+            loadData();
+        }
+
+        async function save() {
+            const data = { name: document.getElementById('n').value, date: document.getElementById('d').value, amount: document.getElementById('a').value, status: document.getElementById('s').value };
+            await fetch('/api/invoices', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(data) });
+            alert("تم الحفظ"); loadData();
+        }
+
+        async function loadData() {
+            const res = await fetch('/api/invoices');
+            const data = await res.json();
+            document.getElementById('b').innerHTML = data.map(i => `<tr><td>${i.customer_name}</td><td>${new Date(i.invoice_date).toLocaleDateString()}</td><td>${i.amount}</td><td>${i.status || 'تم التوصيل'}</td></tr>`).join('');
+            
+            // تحديث الأرقام
+            document.getElementById('t1').innerText = data.length;
+            document.getElementById('t2').innerText = data.filter(i => i.status === 'تم التوصيل').length;
+            document.getElementById('t3').innerText = data.filter(i => i.status === 'معلقة').length;
+            document.getElementById('t4').innerText = data.filter(i => i.status === 'ملغية').length;
+            document.getElementById('t5').innerText = data.filter(i => i.status === 'مرتجع').length;
+        }
+
+        function exportToExcel() { XLSX.writeFile(XLSX.utils.table_to_book(document.querySelector("table")), "الفواتير.xlsx"); }
+
+        function importFromExcel(e) {
+            const reader = new FileReader();
+            reader.onload = async (ev) => {
+                const workbook = XLSX.read(new Uint8Array(ev.target.result), {type: 'array'});
+                const jsonData = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                for(let row of jsonData) {
+                    const keys = Object.keys(row);
+                    await fetch('/api/invoices', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            name: row["العميل"] || row["الاسم"] || row[keys[0]],
+                            date: row["التاريخ"] || row[keys[1]] || new Date(),
+                            amount: row["المبلغ"] || row[keys[2]] || 0,
+                            status: row["الحالة"] || "تم التوصيل"
+                        })
+                    });
+                }
+                alert("تم الاستيراد بنجاح"); loadData();
+            };
+            reader.readAsArrayBuffer(e.target.files[0]);
+        }
+        window.onload = loadData;
+    </script>
+</body>
+</html>
